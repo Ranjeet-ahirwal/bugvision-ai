@@ -23,10 +23,24 @@ app = FastAPI(
 # Model Configuration
 # ============================================================
 
-MODEL_PATH = "models/bug_prediction_model.joblib"
-METADATA_PATH = "models/model_metadata.json"
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-REPORTS_DIR = "reports"
+MODEL_PATH = os.path.join(
+    BASE_DIR,
+    "models",
+    "bug_prediction_model.joblib"
+)
+
+METADATA_PATH = os.path.join(
+    BASE_DIR,
+    "models",
+    "model_metadata.json"
+)
+
+REPORTS_DIR = os.path.join(
+    BASE_DIR,
+    "reports"
+)
 
 os.makedirs(REPORTS_DIR, exist_ok=True)
 
