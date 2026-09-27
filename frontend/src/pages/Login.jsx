@@ -1,9 +1,12 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import api from "../services/api";
+
+import { useAuth } from "../context/AuthContext";
 
 function Login() {
   const navigate = useNavigate();
+
+  const { login } = useAuth();
 
   const [formData, setFormData] = useState({
     email: "",
@@ -28,16 +31,9 @@ function Login() {
     setLoading(true);
 
     try {
-      const response = await api.post(
-        "/auth/login",
-        formData
-      );
-
-      const { token } = response.data;
-
-      localStorage.setItem(
-        "bugvision_token",
-        token
+      await login(
+        formData.email,
+        formData.password
       );
 
       navigate("/dashboard");
