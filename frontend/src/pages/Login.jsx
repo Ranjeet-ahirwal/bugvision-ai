@@ -1,12 +1,9 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import api from "../services/api";
 
-import { useAuth } from "../context/AuthContext";
-
-const Login = () => {
+function Login() {
   const navigate = useNavigate();
-
-  const { login } = useAuth();
 
   const [formData, setFormData] = useState({
     email: "",
@@ -15,31 +12,39 @@ const Login = () => {
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
-  const handleChange = (event) => {
+  const handleChange = (e) => {
     setFormData({
       ...formData,
-      [event.target.name]: event.target.value
+      [e.target.name]: e.target.value
     });
   };
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
     setError("");
     setLoading(true);
 
     try {
-      await login(
-        formData.email,
-        formData.password
+      const response = await api.post(
+        "/auth/login",
+        formData
+      );
+
+      const { token } = response.data;
+
+      localStorage.setItem(
+        "bugvision_token",
+        token
       );
 
       navigate("/dashboard");
     } catch (error) {
       setError(
         error.response?.data?.message ||
-          "Login failed. Please try again."
+          "Login failed. Please check your email and password."
       );
     } finally {
       setLoading(false);
@@ -47,43 +52,44 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center px-4">
 
       <div className="w-full max-w-md">
 
-        <div className="mb-8 text-center">
-          <h1 className="text-4xl font-bold text-white">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold">
             BugVision AI
           </h1>
 
-          <p className="mt-3 text-slate-400">
+          <p className="text-slate-400 mt-3">
             AI-Based Software Bug Prediction
           </p>
         </div>
 
-        <div className="rounded-2xl border border-slate-800 bg-slate-900 p-8 shadow-xl">
+        {/* Login Card */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-xl">
 
-          <h2 className="text-2xl font-semibold text-white">
+          <h2 className="text-2xl font-semibold mb-2">
             Welcome back
           </h2>
 
-          <p className="mt-2 text-sm text-slate-400">
-            Sign in to continue to BugVision AI.
+          <p className="text-slate-400 mb-6">
+            Sign in to your BugVision AI account.
           </p>
 
+          {/* Error Message */}
           {error && (
-            <div className="mt-5 rounded-lg border border-red-800 bg-red-950/40 px-4 py-3 text-sm text-red-300">
+            <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 mb-5">
               {error}
             </div>
           )}
 
-          <form
-            onSubmit={handleSubmit}
-            className="mt-6 space-y-5"
-          >
+          <form onSubmit={handleSubmit}>
 
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-300">
+            {/* Email */}
+            <div className="mb-5">
+              <label className="block text-sm font-medium mb-2">
                 Email
               </label>
 
@@ -92,45 +98,67 @@ const Login = () => {
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
-                placeholder="you@example.com"
+                placeholder="Enter your email"
                 required
-                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white outline-none placeholder:text-slate-500 focus:border-blue-500"
+                className="w-full px-4 py-3 rounded-lg bg-slate-100 text-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-300">
+            {/* Password */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium mb-2">
                 Password
               </label>
 
-              <input
-                type="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                placeholder="Enter your password"
-                required
-                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white outline-none placeholder:text-slate-500 focus:border-blue-500"
-              />
+              <div className="relative">
+                <input
+                  type={
+                    showPassword
+                      ? "text"
+                      : "password"
+                  }
+                  name="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  placeholder="Enter your password"
+                  required
+                  className="w-full px-4 py-3 pr-20 rounded-lg bg-slate-100 text-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
+                />
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setShowPassword(!showPassword)
+                  }
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-blue-600 hover:text-blue-800"
+                >
+                  {showPassword
+                    ? "Hide"
+                    : "Show"}
+                </button>
+              </div>
             </div>
 
+            {/* Login Button */}
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-lg bg-blue-600 px-4 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 py-3 rounded-lg font-medium transition"
             >
               {loading
                 ? "Signing in..."
-                : "Sign In"}
+                : "Login"}
             </button>
 
           </form>
 
-          <p className="mt-6 text-center text-sm text-slate-400">
+          {/* Register Link */}
+          <p className="text-center text-slate-400 mt-6">
             Don't have an account?{" "}
+
             <Link
               to="/register"
-              className="font-medium text-blue-400 hover:text-blue-300"
+              className="text-blue-400 hover:text-blue-300 font-medium"
             >
               Create one
             </Link>
@@ -142,6 +170,6 @@ const Login = () => {
 
     </div>
   );
-};
+}
 
 export default Login;

@@ -9,6 +9,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import ProjectWorkspace from "./pages/ProjectWorkspace";
 import PredictionRunDetails from "./pages/PredictionRunDetails";
+import Register from "./pages/Register";
 
 import ProtectedRoute from "./routes/ProtectedRoute";
 
@@ -23,6 +24,11 @@ function App() {
           path="/login"
           element={<Login />}
         />
+
+        <Route 
+  path="/register" 
+  element={<Register />} 
+/>
 
         {/* Protected Routes */}
         <Route element={<ProtectedRoute />}>
