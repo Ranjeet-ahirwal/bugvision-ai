@@ -139,7 +139,7 @@ const uploadDataset = async (req, res) => {
 
             dataset: {
 
-                id:
+                _id:
                     dataset._id,
 
                 project:
