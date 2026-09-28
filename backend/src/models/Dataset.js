@@ -1,6 +1,5 @@
 const mongoose = require("mongoose");
 
-
 // ============================================================
 // Dataset Schema
 // ============================================================
@@ -31,9 +30,17 @@ const datasetSchema = new mongoose.Schema(
             trim: true
         },
 
+        // Temporary/local path used during processing
         filePath: {
             type: String,
             required: true
+        },
+
+        // Permanent Supabase Storage path
+        storagePath: {
+            type: String,
+            required: true,
+            trim: true
         },
 
         fileSize: {
@@ -61,7 +68,6 @@ const datasetSchema = new mongoose.Schema(
         timestamps: true
     }
 );
-
 
 // ============================================================
 // Dataset Model

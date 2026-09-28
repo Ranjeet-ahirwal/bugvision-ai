@@ -1,4 +1,6 @@
 const mongoose = require("mongoose");
+const fs = require("fs");
+const path = require("path");
 
 const PredictionRun = require("../models/PredictionRun");
 const PredictionResult = require("../models/PredictionResult");
@@ -8,13 +10,21 @@ const {
   predictDataset
 } = require("../services/mlService");
 
+const {
+  downloadFile
+} = require("../services/supabaseStorageService");
+
 
 // =====================================================
 // RUN PREDICTION
 // =====================================================
 
 const runPrediction = async (req, res) => {
+
+  let temporaryFilePath = null;
+
   try {
+
     const { datasetId } = req.params;
 
     // ---------------------------------------------
@@ -47,16 +57,55 @@ const runPrediction = async (req, res) => {
     );
 
     // ---------------------------------------------
-    // Check dataset file
+    // Validate Supabase storage path
     // ---------------------------------------------
 
-    const fs = require("fs");
-
-    if (!fs.existsSync(dataset.filePath)) {
+    if (!dataset.storagePath) {
       return res.status(404).json({
-        message: "Dataset file not found on server."
+        message: "Dataset storage path not found."
       });
     }
+
+    console.log(
+      `Downloading dataset from Supabase: ${dataset.storagePath}`
+    );
+
+    // ---------------------------------------------
+    // Create temporary local directory
+    // ---------------------------------------------
+
+    const temporaryDirectory = path.join(
+      __dirname,
+      "../../uploads"
+    );
+
+    if (!fs.existsSync(temporaryDirectory)) {
+      fs.mkdirSync(temporaryDirectory, {
+        recursive: true
+      });
+    }
+
+    // ---------------------------------------------
+    // Create temporary file path
+    // ---------------------------------------------
+
+    temporaryFilePath = path.join(
+      temporaryDirectory,
+      `prediction-${dataset._id}-${Date.now()}.csv`
+    );
+
+    // ---------------------------------------------
+    // Download dataset from Supabase
+    // ---------------------------------------------
+
+    await downloadFile(
+      dataset.storagePath,
+      temporaryFilePath
+    );
+
+    console.log(
+      "Dataset downloaded successfully."
+    );
 
     // ---------------------------------------------
     // Create prediction run
@@ -77,12 +126,13 @@ const runPrediction = async (req, res) => {
     await dataset.save();
 
     try {
+
       // -------------------------------------------
       // Send dataset to ML service
       // -------------------------------------------
 
       const mlResponse = await predictDataset(
-        dataset.filePath
+        temporaryFilePath
       );
 
       console.log(
@@ -221,14 +271,21 @@ const runPrediction = async (req, res) => {
       // -------------------------------------------
 
       return res.status(200).json({
+
         message:
           "Prediction completed successfully.",
 
         predictionRun: {
           _id: predictionRun._id,
-          dataset: predictionRun.dataset,
-          project: predictionRun.project,
-          owner: predictionRun.owner,
+
+          dataset:
+            predictionRun.dataset,
+
+          project:
+            predictionRun.project,
+
+          owner:
+            predictionRun.owner,
 
           totalRows:
             predictionRun.totalRows,
@@ -251,6 +308,7 @@ const runPrediction = async (req, res) => {
           completedAt:
             predictionRun.completedAt
         }
+
       });
 
     } catch (predictionError) {
@@ -280,6 +338,7 @@ const runPrediction = async (req, res) => {
       await dataset.save();
 
       return res.status(500).json({
+
         message:
           "Prediction failed.",
 
@@ -299,12 +358,44 @@ const runPrediction = async (req, res) => {
     );
 
     return res.status(500).json({
+
       message:
         "Failed to start prediction.",
 
       error:
         error.message
     });
+
+  } finally {
+
+    // ---------------------------------------------
+    // Always remove temporary local CSV
+    // ---------------------------------------------
+
+    if (
+      temporaryFilePath &&
+      fs.existsSync(temporaryFilePath)
+    ) {
+
+      try {
+
+        fs.unlinkSync(
+          temporaryFilePath
+        );
+
+        console.log(
+          "Temporary prediction file removed."
+        );
+
+      } catch (cleanupError) {
+
+        console.error(
+          "Temporary file cleanup error:",
+          cleanupError.message
+        );
+
+      }
+    }
   }
 };
 
@@ -314,13 +405,17 @@ const runPrediction = async (req, res) => {
 // =====================================================
 
 const getPredictionRun = async (req, res) => {
+
   try {
+
     const { runId } = req.params;
 
     if (!mongoose.Types.ObjectId.isValid(runId)) {
+
       return res.status(400).json({
         message: "Invalid prediction run ID."
       });
+
     }
 
     const predictionRun =
@@ -338,10 +433,12 @@ const getPredictionRun = async (req, res) => {
         );
 
     if (!predictionRun) {
+
       return res.status(404).json({
         message:
           "Prediction run not found."
       });
+
     }
 
     return res.status(200).json({
@@ -359,6 +456,7 @@ const getPredictionRun = async (req, res) => {
       message:
         "Failed to fetch prediction run."
     });
+
   }
 };
 
@@ -371,13 +469,18 @@ const getPredictionResults = async (
   req,
   res
 ) => {
+
   try {
+
     const { runId } = req.params;
 
     if (!mongoose.Types.ObjectId.isValid(runId)) {
+
       return res.status(400).json({
-        message: "Invalid prediction run ID."
+        message:
+          "Invalid prediction run ID."
       });
+
     }
 
     // ---------------------------------------------
@@ -391,10 +494,12 @@ const getPredictionResults = async (
       });
 
     if (!predictionRun) {
+
       return res.status(404).json({
         message:
           "Prediction run not found."
       });
+
     }
 
     // ---------------------------------------------
@@ -437,23 +542,30 @@ const getPredictionResults = async (
       risk &&
       ["HIGH", "MEDIUM", "LOW"].includes(risk)
     ) {
+
       query.riskLevel = risk;
+
     }
 
     if (
       prediction &&
-      ["Defective", "Non-Defective"].includes(
-        prediction
-      )
+      [
+        "Defective",
+        "Non-Defective"
+      ].includes(prediction)
     ) {
+
       query.prediction = prediction;
+
     }
 
     if (component) {
+
       query.component = {
         $regex: component,
         $options: "i"
       };
+
     }
 
     // ---------------------------------------------
@@ -481,12 +593,17 @@ const getPredictionResults = async (
       );
 
     return res.status(200).json({
+
       results,
 
       pagination: {
+
         page,
+
         limit,
+
         totalResults,
+
         totalPages,
 
         hasNextPage:
@@ -494,17 +611,22 @@ const getPredictionResults = async (
 
         hasPreviousPage:
           page > 1
+
       },
 
       filters: {
-        risk: risk || null,
+
+        risk:
+          risk || null,
 
         prediction:
           prediction || null,
 
         component:
           component || null
+
       }
+
     });
 
   } catch (error) {
@@ -518,6 +640,7 @@ const getPredictionResults = async (
       message:
         "Failed to fetch prediction results."
     });
+
   }
 };
 
@@ -530,7 +653,9 @@ const getProjectPredictionHistory = async (
   req,
   res
 ) => {
+
   try {
+
     const { projectId } = req.params;
 
     if (
@@ -538,9 +663,12 @@ const getProjectPredictionHistory = async (
         projectId
       )
     ) {
+
       return res.status(400).json({
-        message: "Invalid project ID."
+        message:
+          "Invalid project ID."
       });
+
     }
 
     // ---------------------------------------------
@@ -549,8 +677,11 @@ const getProjectPredictionHistory = async (
 
     const predictionRuns =
       await PredictionRun.find({
+
         project: projectId,
+
         owner: req.user.userId
+
       })
         .populate(
           "dataset",
@@ -561,10 +692,12 @@ const getProjectPredictionHistory = async (
         });
 
     return res.status(200).json({
+
       totalRuns:
         predictionRuns.length,
 
       predictionRuns
+
     });
 
   } catch (error) {
@@ -578,17 +711,22 @@ const getProjectPredictionHistory = async (
       message:
         "Failed to fetch prediction history."
     });
+
   }
 };
-
 
 
 // =====================================================
 // DOWNLOAD PREDICTION CSV REPORT
 // =====================================================
 
-const downloadPredictionReport = async (req, res) => {
+const downloadPredictionReport = async (
+  req,
+  res
+) => {
+
   try {
+
     const { runId } = req.params;
 
     // ---------------------------------------------
@@ -596,9 +734,12 @@ const downloadPredictionReport = async (req, res) => {
     // ---------------------------------------------
 
     if (!mongoose.Types.ObjectId.isValid(runId)) {
+
       return res.status(400).json({
-        message: "Invalid prediction run ID."
+        message:
+          "Invalid prediction run ID."
       });
+
     }
 
     // ---------------------------------------------
@@ -607,28 +748,38 @@ const downloadPredictionReport = async (req, res) => {
 
     const predictionRun =
       await PredictionRun.findOne({
+
         _id: runId,
+
         owner: req.user.userId
+
       }).populate(
         "dataset",
         "originalName"
       );
 
     if (!predictionRun) {
+
       return res.status(404).json({
-        message: "Prediction run not found."
+        message:
+          "Prediction run not found."
       });
+
     }
 
     // ---------------------------------------------
     // Only completed runs can be exported
     // ---------------------------------------------
 
-    if (predictionRun.status !== "completed") {
+    if (
+      predictionRun.status !== "completed"
+    ) {
+
       return res.status(400).json({
         message:
           "Only completed prediction runs can be exported."
       });
+
     }
 
     // ---------------------------------------------
@@ -637,16 +788,22 @@ const downloadPredictionReport = async (req, res) => {
 
     const results =
       await PredictionResult.find({
+
         predictionRun: runId
+
       })
-        .sort({ row: 1 })
+        .sort({
+          row: 1
+        })
         .lean();
 
     if (!results.length) {
+
       return res.status(404).json({
         message:
           "No prediction results found for this run."
       });
+
     }
 
     // ---------------------------------------------
@@ -654,21 +811,30 @@ const downloadPredictionReport = async (req, res) => {
     // ---------------------------------------------
 
     const escapeCsvValue = (value) => {
-      if (value === null || value === undefined) {
+
+      if (
+        value === null ||
+        value === undefined
+      ) {
+
         return "";
+
       }
 
-      const stringValue = String(value);
+      const stringValue =
+        String(value);
 
       if (
         stringValue.includes(",") ||
         stringValue.includes('"') ||
         stringValue.includes("\n")
       ) {
+
         return `"${stringValue.replace(
           /"/g,
           '""'
         )}"`;
+
       }
 
       return stringValue;
@@ -679,6 +845,7 @@ const downloadPredictionReport = async (req, res) => {
     // ---------------------------------------------
 
     const csvRows = [
+
       [
         "Row",
         "Component",
@@ -686,6 +853,7 @@ const downloadPredictionReport = async (req, res) => {
         "Prediction",
         "Risk Level"
       ]
+
     ];
 
     // ---------------------------------------------
@@ -693,26 +861,35 @@ const downloadPredictionReport = async (req, res) => {
     // ---------------------------------------------
 
     results.forEach((result) => {
+
       csvRows.push([
+
         result.row,
+
         result.component,
+
         result.defectProbability,
+
         result.prediction,
+
         result.riskLevel
+
       ]);
+
     });
 
     // ---------------------------------------------
     // Convert rows to CSV
     // ---------------------------------------------
 
-    const csvContent = csvRows
-      .map((row) =>
-        row
-          .map(escapeCsvValue)
-          .join(",")
-      )
-      .join("\n");
+    const csvContent =
+      csvRows
+        .map((row) =>
+          row
+            .map(escapeCsvValue)
+            .join(",")
+        )
+        .join("\n");
 
     // ---------------------------------------------
     // Create safe filename
@@ -724,8 +901,14 @@ const downloadPredictionReport = async (req, res) => {
 
     const safeDatasetName =
       datasetName
-        .replace(/\.[^/.]+$/, "")
-        .replace(/[^a-zA-Z0-9-_]/g, "_");
+        .replace(
+          /\.[^/.]+$/,
+          ""
+        )
+        .replace(
+          /[^a-zA-Z0-9-_]/g,
+          "_"
+        );
 
     const filename =
       `${safeDatasetName}_prediction_report.csv`;
@@ -759,6 +942,7 @@ const downloadPredictionReport = async (req, res) => {
       message:
         "Failed to generate prediction report."
     });
+
   }
 };
 
@@ -768,9 +952,15 @@ const downloadPredictionReport = async (req, res) => {
 // =====================================================
 
 module.exports = {
+
   runPrediction,
+
   getPredictionRun,
+
   getPredictionResults,
+
   getProjectPredictionHistory,
+
   downloadPredictionReport
+
 };
